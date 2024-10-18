@@ -1,3 +1,5 @@
+"""Estimators of distribution parameters used for lower-order models"""
+
 
 # MIT License
 

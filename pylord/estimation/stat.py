@@ -1,4 +1,4 @@
-"""Distribution functions, parameter estimation codes"""
+"""Distribution functions and parameter estimators"""
 
 # MIT License
 

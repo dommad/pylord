@@ -17,6 +17,12 @@ setup(
     name='pylord',
     version='0.1.0',
     packages=find_packages(),
-    ext_modules=cythonize(extensions)
+    ext_modules=cythonize(extensions),
+    entry_points={
+        'console_scripts': [
+            'pylord-estimate = pylord.main:main',
+            'pylord-validate = pylord.main:main',
+        ]
+    }
 )
 

@@ -1,4 +1,4 @@
-"""Exporters"""
+"""Exporters of distribution parameters"""
 
 # MIT License
 

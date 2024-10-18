@@ -59,7 +59,6 @@ class EstimationInitializer:
 
     def initialize_parameter_estimators(self):
         estimator_names = self.config.get('estimation', 'estimators').strip().split(', ')
-        # TODO: add error handling
         estimator_objects = [getattr(estimators, x) if hasattr(estimators, x) else AttributeError(f"{x} not found in estimators module!") for x in estimator_names]
         return estimator_objects
 
@@ -162,13 +161,13 @@ class PlotInitializer(Initializer):
         self.config_plot = config.get('general.plotting', 'plot_results').strip()
 
 
-    def initialize(self, optimal_parameters, parameters_data, df):
+    def initialize(self, optimal_parameters, parameters_data, df, decoy_df):
 
         if self.config_plot not in self.bool_mapping:
             raise ValueError("'plot_results' options has invalid value. Use 'True' or 'False'.")
         
         if self.bool_mapping.get(self.config_plot, True):
-            return PlotEstimationResults(self.config, optimal_parameters, parameters_data, df)
+            return PlotEstimationResults(self.config, optimal_parameters, parameters_data, df, decoy_df)
         
         return None
             

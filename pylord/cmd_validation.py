@@ -1,6 +1,6 @@
-import argparse
-from pylord.validation.run import run_validation
+"""Script for command-line execution of validation on PyLord results"""
 
+# MIT License
 
 # Copyright (c) 2023 Dominik Madej
 
@@ -21,6 +21,9 @@ from pylord.validation.run import run_validation
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+
+import argparse
+from pylord.validation.run import run_validation
 
 
 def display_info():
@@ -59,4 +62,8 @@ if __name__ == "__main__":
                         (with tag 'decoy' in its name) to serve as a basis for constructing a decoy null model.""")
 
     arguments = arg_parser.parse_args()
+    
+    if arguments is None:
+        arg_parser.print_usage()
+
     run_validation(args=arguments)

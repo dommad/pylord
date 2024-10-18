@@ -1,3 +1,6 @@
+"""Modes of optimizing the parameters of top null models
+using the lower-order models information"""
+
 
 # MIT License
 

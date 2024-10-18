@@ -27,6 +27,7 @@
 
 from typing import Tuple
 import pandas as pd
+import scipy.stats as st
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
@@ -43,7 +44,7 @@ matplotlib.use('Agg')
 class PlotEstimationResults:
     """Plotting functionalities for the analysis of lower-order models"""
 
-    def __init__(self, config, optimal_parameters, parameters_data, results_df) -> None:
+    def __init__(self, config, optimal_parameters, parameters_data, results_df, decoy_df) -> None:
 
         self.filter_score = config.get('general', 'filter_score').strip()
         self.out_name = config.get('general', 'output_path').strip()
@@ -53,15 +54,17 @@ class PlotEstimationResults:
         self.optimal_parameters = optimal_parameters
         self.parameters_data = parameters_data
         self.df = results_df
+        self.decoy_df = decoy_df
 
-        plt.style.use('ggplot')
-        plt.rcParams.update({'font.size': 12, 'font.family': 'Arial',
-                             'xtick.labelsize': 10, 'ytick.labelsize': 10})
+        plt.style.use('default')
+        plt.rcParams.update({'font.size': 12,
+                             'xtick.labelsize': 10,
+                             'ytick.labelsize': 10})
         
 
     def save_figure(self, fig, core_name):
         """general function for saving the figures"""
-        fig.savefig(f"{self.out_name}{core_name}.{self.file_format}", dpi=self.dpi)
+        fig.savefig(f"{self.out_name}{core_name}.{self.file_format}", dpi=self.dpi, bbox_inches='tight')
 
 
 
@@ -228,9 +231,18 @@ class PlotEstimationResults:
     @staticmethod
     def get_rough_pi0_estimate(scores, mu, beta, hit_rank):
 
-        pi0 = len(scores[scores < 0.2]) / len(scores)
+        #pi0 = len(scores[scores < 0.2]) / len(scores)
         xs, kde_observed = FFTKDE(bw=0.01, kernel='gaussian').fit(scores).evaluate(2**8)
         pdf_fitted = stat.TEVDistribution().pdf(xs, mu, beta, hit_rank=hit_rank)
+        pvals = 1-st.gumbel_r.cdf(scores, 0.138, 0.02)
+        
+        pi0s = []
+        #for i in np.linspace(0.6, 0.8, 50):
+        #    pi0s.append(len(pvals[pvals > i]) / ((1 - i) * len(pvals)))
+        
+        #pi0 = np.mean(pi0s)
+        pi0 = len(pvals[pvals > 0.8]) / ((1 - 0.8) * len(pvals))
+
 
         return pi0, xs, kde_observed, pdf_fitted
 
@@ -253,30 +265,86 @@ class PlotEstimationResults:
 
             pi0, xs, kde_observed, pdf_fitted = self.get_rough_pi0_estimate(top_scores, mu, beta, 1) # we only work on top hits
 
+            if self.decoy_df is not None:
+                top_mask_d = (self.decoy_df['charge'] == charge) & (self.decoy_df['hit_rank'] == 1)
+                top_scores_d = self.decoy_df.loc[top_mask_d, self.filter_score].values
+                mu_d, beta_d = st.gumbel_r.fit(top_scores_d)
+    
+                _, xs_d, kde_observed_d, pdf_fitted_d = self.get_rough_pi0_estimate(top_scores_d, mu_d, beta_d, 1) # we only work on top hits
+                axs[idx_combinations[idx]].plot(xs_d,  pi0 * pdf_fitted_d, color='magenta', linestyle='-', label='fitted')
+                
+                self.plot_qq(charge, top_scores, mu, beta, mu_d, beta_d)
+
+
+          
+
             axs[idx_combinations[idx]].fill_between(xs, kde_observed, alpha=0.2, color=colors[0], label='observed')
             axs[idx_combinations[idx]].plot(xs, kde_observed, color=colors[1])
             axs[idx_combinations[idx]].plot(xs,  pi0 * pdf_fitted, color=colors[2], linestyle='-', label='fitted')
+            axs[idx_combinations[idx]].set_xlim(0.0, 0.8)
+            axs[idx_combinations[idx]].set_ylim(0,)
+            axs[idx_combinations[idx]].set_xlabel("TEV")
+            axs[idx_combinations[idx]].set_ylabel("density")
+            # axs[idx_combinations[idx]].set_title(f"charge {charge}+")
+
+            self.save_figure(fig, f"fitted_top_models_{charge}")
+
+
+
+    def plot_decoy_model_with_pi0(self):
+        """overlay decoy models on the empirical mixture distributions"""
+
+        num_charges = len(self.optimal_parameters)
+        colors = ('#2CB199', '#2CB199', '#D65215')
+
+        n_row, n_col, idx_combinations = self.get_optimal_subplot_settings(num_charges)
+        fig, axs = plt.subplots(n_row, n_col, figsize=(n_col * 3, n_row * 3), constrained_layout=True)
+
+
+        for idx, charge in enumerate(self.optimal_parameters):
+            top_mask_d = (self.decoy_df['charge'] == charge) & (self.decoy_df['hit_rank'] == 1)
+            top_scores_d = self.decoy_df.loc[top_mask_d, self.filter_score].values
+            mu, beta = st.gumbel_r.fit(top_scores_d)
+
+            top_mask_t = (self.df['charge'] == charge) & (self.df['hit_rank'] == 1)
+            top_scores_t = self.df.loc[top_mask_t, self.filter_score].values
+
+            
+
+            pi0, xs, kde_observed, pdf_fitted = self.get_rough_pi0_estimate(top_scores_t, mu, beta, 1) # we only work on top hits
+            pi0, xs, kde_observed, pdf_fitted = self.get_rough_pi0_estimate(top_scores_t, mu, beta, 1) # we only work on top hits
+
+            axs[idx_combinations[idx]].fill_between(xs, kde_observed, alpha=0.2, color=colors[0], label='observed')
+            axs[idx_combinations[idx]].plot(xs, kde_observed, color=colors[1])
+            axs[idx_combinations[idx]].plot(xs,  pi0 * pdf_fitted, color=colors[2], linestyle='-', label='decoy')
             axs[idx_combinations[idx]].set_xlim(0.0, 0.6)
             axs[idx_combinations[idx]].set_ylim(0,)
             axs[idx_combinations[idx]].set_xlabel("TEV")
             axs[idx_combinations[idx]].set_ylabel("density")
 
-        self.save_figure(fig, "fitted_top_models")
+        self.save_figure(fig, "fitted_top_models_decoy")
 
 
-    ### plotting for BIC ###
+    def plot_qq(self, charge, observed, lower_mu, lower_beta, decoy_mu, decoy_beta):
 
-    # def plot_bic_diffs(self, bic_diffs, charge):
-    #     """Plot BIC differences for TEV distributions for given charge state"""
+    
+        (osr_l, osm_l), (slope, intercept, r) = st.probplot(observed, dist=st.gumbel_r, sparams=(lower_mu, lower_beta))
+        (osr_d, osm_d), (slope, intercept, r) = st.probplot(observed, dist=st.gumbel_r, sparams=(decoy_mu, decoy_beta))
 
-    #     fig, axs = plt.subplots(figsize=(10, 5), constrained_layout=True)
-    #     color = '#2D58B8'
+        fig, ax = plt.subplots(figsize=(4, 4))
+        # Plot the data points with custom marker size and color
+        ax.plot(osm_l, osr_l, color='blue', label='PyLord')
+        ax.plot(osm_d, osr_d, color='orange', label='decoy')
 
-    #     xs = np.arange(len(bic_diffs)) + 2 # we start from 2nd hit
-    #     axs.scatter(xs, bic_diffs, color=color)
-    #     axs.plot(xs, bic_diffs, color=color)
-
-    #     axs.set_xlabel("hit_rank")
-    #     axs.set_ylabel("relative BIC difference [%]")
-
-    #     fig.savefig(f"{self.out_name}_lower_models_BIC_charge_{charge}.pdf", dpi=600, bbox_inches="tight")
+        # Plot the reference line
+        #ax.plot(osm, slope*osm + intercept, 'r--', lw=2, label='Fit Line')
+        ax.plot([min(osm_l[0], osr_l[0], osm_d[0], osr_d[0]), max(osm_l[-1], osr_l[-1], osm_d[-1], osr_d[-1])], 
+                [min(osm_l[0], osr_l[0], osm_d[0], osr_d[0]), max(osm_l[-1], osr_l[-1], osm_d[-1], osr_d[-1])],
+                color='grey', label='x=y')
+        
+        ax.set_ylabel('tested quantiles (null model)')
+        ax.set_xlabel('reference quantiles (observed data)')
+        ax.set_xlim(0.9*min(osm_l[0], osm_d[0]), 0.3)
+        ax.set_ylim(0.9*min(osr_l[0], osr_d[0]), 0.3)
+        ax.legend()
+        self.save_figure(fig, f"qq_plot_models_charge_{charge}")

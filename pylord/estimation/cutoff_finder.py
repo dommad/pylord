@@ -29,9 +29,12 @@ from abc import ABC, abstractmethod
 from KDEpy import FFTKDE
 import pandas as pd
 import numpy as np
+from scipy.signal import argrelextrema
+from ..constants import FIXED_CUTOFF
 
 
 class CutoffFinder(ABC):
+    """Abstract class for a generic score cutoff finder"""
 
     def __init__(self, df, filter_score) -> None:
 
@@ -50,9 +53,10 @@ class CutoffFinder(ABC):
 
 
 class PeakDipFinder:
+    """Find the dips in the score mixture distribution"""
 
     @staticmethod
-    def find_peaks_and_dips(axes, kde):
+    def find_peaks(axes, kde):
         """
         Find peaks in TEV data.
 
@@ -63,22 +67,14 @@ class PeakDipFinder:
         - indices (array): Indices of peaks in the data.
         """
 
-        # Compute differences between consecutive elements
-        diff = np.diff(kde)
-
-        # Find indices of peaks and dips
-        # peaks = np.where((diff[:-1] > 0) & (diff[1:] <= 0))[0] + 1
-        dips = np.where((diff[:-1] < 0) & (diff[1:] >= 0))[0] + 1
-        
-        # dips = np.where((kde[1:-1] < kde[:-2]) & (kde[1:-1] < kde[2:]))[0] + 1
-        return axes[dips] # , axes[peaks]
+        minima_indices = argrelextrema(kde, np.less)[0]
+        return minima_indices
 
 
 
 class MainDipCutoff(CutoffFinder, PeakDipFinder):
     """Finding the cutoff by idenifying the main dip between negative and positive
     components of the mixture distribution"""
-    # TODO: fix it, it doesn't work properly now
 
     def find_cutoff(self) -> float:
         """
@@ -90,13 +86,14 @@ class MainDipCutoff(CutoffFinder, PeakDipFinder):
             raise ValueError("Empty scores array. Unable to find cutoff.")
 
         axes, kde = FFTKDE(bw=0.05, kernel='gaussian').fit(scores).evaluate(2**8)
-        dips = self.find_peaks_and_dips(axes, kde)
+        dips = self.find_peaks(axes, kde)
+        
 
-        return np.median(scores) if dips == [] else dips[max(0, int(len(dips / 2)) - 1)]
+        return np.median(scores) if len(dips) == 0 else axes[dips][0]
 
 
 
 class FixedCutoff(CutoffFinder):
 
     def find_cutoff(self):
-        return 0.21
+        return FIXED_CUTOFF

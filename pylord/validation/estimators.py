@@ -1,4 +1,4 @@
-
+"""Estimators of pi0 (the fraction of incorrect PSMs in among all top-scoring PSMs)"""
 
 # MIT License
 
@@ -74,62 +74,14 @@ class BootstrapPiZero(PiZeroEstimator):
 
         return pi_0
 
-    # @staticmethod
-    # def get_pi0_b(pvs, b_val):
-    #     """calculate pi0 estimate for given b value"""
-    #     i = 1
-    #     condition = False
-
-    #     while condition is False:
-    #         t_i = (i-1)/b_val
-    #         t_iplus = i/b_val
-    #         ns_i = len(pvs[(pvs < t_iplus) & (pvs >= t_i)])
-    #         nb_i = len(pvs[pvs >= t_i])
-    #         condition = bool(ns_i <= nb_i/(b_val - i + 1))
-    #         i += 1
-
-    #     i -= 1
-
-    #     summand = 0
-    #     for j in range(i-1, b_val+1):
-    #         t_j = (j-1)/b_val
-    #         summand += len(pvs[pvs >= t_j])/((1-t_j)*len(pvs))
-
-    #     pi_0 = 1/(b_val - i + 2)*summand
-
-    #     return pi_0
 
     def get_all_pi0s(self, pvs):
         b_set = [5, 10, 20, 50, 100]
         return [self.get_pi0_b(pvs, b_val) for b_val in b_set]
 
-    # def get_all_pi0s(self, pvs):
-    #     """calculate pi0 for each b value"""
-    #     # B is from I = {5, 10, 20, 50, 100}
-
-    #     pi0s = []
-    #     b_set = [5, 10, 20, 50, 100]
-
-    #     for b_val in b_set:
-    #         pi0s.append(self.get_pi0_b(pvs, b_val))
-        
-    #     return pi0s
-
 
     def get_bootstrap_pi0s(self, pvs, no_reps, b_val):
         return np.array([self.get_pi0_b(np.random.choice(pvs, size=len(pvs)), b_val) for _ in range(no_reps)])
-
-
-    # def get_boostrap_pi0s(self, pvs, no_reps, b_val):
-
-    #     pi0_estimates = np.zeros(no_reps)
-
-    #     for rep in range(no_reps):
-    #         random.seed()
-    #         new_pvs = np.array(random.choices(pvs, k=len(pvs)))
-    #         pi0_estimates[rep] = self.get_pi0_b(new_pvs, b_val)
-
-    #     return pi0_estimates
 
 
     @staticmethod

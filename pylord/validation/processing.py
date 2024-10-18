@@ -74,6 +74,7 @@ class PreProcessing:
     def add_ground_truth_label(df: pd.DataFrame, file_tag: int) -> pd.DataFrame:
         """Adding ground truth label to the dataframe"""
         df['gt_label'] = file_tag * np.ones(len(df))
+    
         return df
 
 
@@ -83,6 +84,8 @@ class BootstrapProcessing:
     def __init__(self, config) -> None:
 
         self.config = config
+        p_value_types = config.get('validation.general', 'p_value_type').strip().split('_')
+        self.p_value_columns = [x+"_p_value" for x in p_value_types]
 
         pi_zero_name = config.get('validation.general', 'pi_zero_method').strip()
 
@@ -94,15 +97,22 @@ class BootstrapProcessing:
 
     def process_bootstrap(self, master_df):
 
-        bootstrap_results = self.initialize_and_run_bootstrap(master_df)
-        tprs, fdps = self.extract_bootstrap_fdps_tprs(bootstrap_results)
+        all_bootstrap_results = []
 
-        if self.pi_zero_calculator is not None:
-            fdps = self.adjust_with_pi_zero(master_df, fdps)
+        for p_value_column in self.p_value_columns:
+            print(f"this is column name: {p_value_column}")
+
+            bootstrap_results = self.initialize_and_run_bootstrap(master_df, p_value_column)
+            tprs, fdps = self.extract_bootstrap_fdps_tprs(bootstrap_results)
+
+            if self.pi_zero_calculator is not None:
+                fdps = self.adjust_with_pi_zero(master_df, fdps)
+            
+            bootstrap_stats = ConfidenceInterval(self.config).calculate_all_confidence_intervals(fdps, tprs)
+            all_bootstrap_results.append(bootstrap_stats)
         
-        bootstrap_stats = ConfidenceInterval(self.config).calculate_all_confidence_intervals(fdps, tprs)
-        
-        return bootstrap_stats
+        print(f"this is length of all res: {len(all_bootstrap_results)}")
+        return all_bootstrap_results
 
 
     @staticmethod
@@ -123,9 +133,9 @@ class BootstrapProcessing:
         return np.array(fdps), np.array(tprs)
 
 
-    def initialize_and_run_bootstrap(self, df):
+    def initialize_and_run_bootstrap(self, df, p_value_column):
         """Initialize the Bootstrap instance and run the bootstrap"""
-        bootstrap_instance = Bootstrap(self.config, initializer.BootstrapInitializer)
+        bootstrap_instance = Bootstrap(self.config, p_value_column, initializer.BootstrapInitializer)
         
         return bootstrap_instance.run_bootstrap(df)
 
@@ -192,12 +202,12 @@ class PValueProcessing:
 class Bootstrap:
     """Bootstrap"""
     
-    def __init__(self, config, init: initializer.Initializer) -> None:
+    def __init__(self, config, p_value_column: str, init: initializer.Initializer) -> None:
 
         self.init = init(config)
         self.n_rep = int(config.get('validation.bootstrap', 'num_rep').strip())
        
-        self.p_value_column = config.get('validation.general', 'p_value_type').strip() + "_p_value"
+        self.p_value_column = p_value_column
         self.fdr_calculator = fetch_instance(fdr, config.get('validation.general', 'fdr_method').strip())
 
     def run_bootstrap(self, df):

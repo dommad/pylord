@@ -49,17 +49,17 @@ def run_validation(args: Namespace = None, config_file_path: str = "", input_fil
     master_df.loc[(master_df.gt_label == 1) & (master_df.tev < 0.3), 'gt_label'] = 2 # just for testing
 
     master_df = PValueProcessing(config, parameters_file_paths).add_p_values_from_all_models(master_df)
-    bootstrap_stats = BootstrapProcessing(config).process_bootstrap(master_df)
+    all_bootstrap_results = BootstrapProcessing(config).process_bootstrap(master_df)
 
     logging.info("Analysis finished!")
 
-    run_plots(config, bootstrap_stats)
+    run_plots(config, all_bootstrap_results)
 
-    return bootstrap_stats, master_df
+    return all_bootstrap_results, master_df
 
 
 
-def run_plots(config, bootstrap_stats):
+def run_plots(config, all_boostrap_results):
 
     logging.info("Plotting started...")
     plotter = PlotInitializer(config).initialize()
@@ -67,7 +67,7 @@ def run_plots(config, bootstrap_stats):
     if plotter is None:
         return
 
-    plotter.plot_validation_results(bootstrap_stats)
+    plotter.plot_validation_results(all_boostrap_results)
     logging.info("Plotting finished!")
 
     
